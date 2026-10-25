@@ -1,0 +1,19 @@
+# Secrets et environnement local
+.env
+.env.*
+!.env.example
+
+# Données runtime (PostgreSQL rootless, sauvegardes)
+data/
+*.dump
+
+# Dépendances et artefacts de build
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Journaux et fichiers système
+*.log
+.DS_Store
