@@ -69,19 +69,27 @@ STARTED=1
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" up --build -d
 
 # 5. Attente de la santé de l'API (réponse JSON validée).
+# La première initialisation de PostgreSQL/PostGIS peut durer plusieurs minutes :
+# le backend ne démarre qu'une fois la base déclarée saine (depends_on).
 health_ok() {
   local body
   body="$(curl -fsS "http://localhost:${API_PORT}/health" 2>/dev/null)" || return 1
   [[ "$body" == *'"status":"ok"'* ]]
 }
-printf '⏳ Attente de l’API sur http://localhost:%s/health' "$API_PORT"
-for _ in $(seq 1 45); do
+
+HEALTH_TIMEOUT="${API_HEALTH_TIMEOUT:-300}"
+HEALTH_INTERVAL=2
+HEALTH_TICKS=$(( HEALTH_TIMEOUT / HEALTH_INTERVAL ))
+printf '⏳ Attente de l’API sur http://localhost:%s/health (max %s s)' "$API_PORT" "$HEALTH_TIMEOUT"
+for _ in $(seq 1 "$HEALTH_TICKS"); do
   health_ok && { echo ' ✔'; break; }
-  printf '.'; sleep 2
+  printf '.'; sleep "$HEALTH_INTERVAL"
 done
 if ! health_ok; then
-  printf '\n⚠️ API indisponible après 90 s. Journaux récents :\n'
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail 25 backend || true
+  printf '\n⚠️ API indisponible après %s s.\n\nÉtat des services :\n\n' "$HEALTH_TIMEOUT"
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
+  printf '\nJournaux récents (tous les services) :\n\n'
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail 40 || true
   die "Corrigez l'erreur ci-dessus puis relancez ./start.sh."
 fi
 

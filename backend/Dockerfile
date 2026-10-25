@@ -5,8 +5,10 @@ WORKDIR /app
 # Copier les fichiers de dépendances
 COPY package*.json ./
 
-# Installer les dépendances (y compris Prisma si ajouté)
-RUN npm install
+# Installer les dépendances de façon reproductible et mémoriser leur empreinte
+# pour que le conteneur de développement ne réinstalle pas à chaque démarrage.
+RUN npm ci --no-audit --no-fund \
+ && cat package.json package-lock.json | sha256sum | cut -d' ' -f1 > node_modules/.deps-hash
 
 # Copier le reste du code
 COPY . .
