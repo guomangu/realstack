@@ -90,17 +90,19 @@ Pour des besoins spécifiques (hors cloud), la génération locale reste possibl
 
 ## **7\. Infrastructure & Déploiement (DevOps)**
 
-L'ensemble des services (API, Base de données PostgreSQL/PostGIS) est isolé et orchestré de manière "File-Based", avec un **moteur de conteneurs interchangeable**.
+L'ensemble des services (API, harvester, Redis, Base de données PostgreSQL/PostGIS) est isolé et orchestré de manière "File-Based", avec un **moteur de conteneurs interchangeable**.
 
 * **Orchestration :** **Podman 5+** en mode rootless sur **Fedora 44** (Ultramarine), avec **Docker Compose** conservé comme solution de repli sur les autres distributions.
 * **Bootstrap automatique :** `start.sh` vérifie et installe les dépendances manquantes (Podman, podman-compose, Node.js 20+, npm, curl) via `dnf`, `apt-get`, `pacman` ou `zypper`. Aucun prérequis ne doit être installé à la main.
 * **Élévation de privilèges :** testée dans l'ordre `root`, `sudo -n`, `sudo` interactif (si terminal), `pkexec`, `doas`. Les paquets ne sont installés que si nécessaire.
 * **Détection automatique :** `start.sh` essaie dans l'ordre `COMPOSE_CMD`, `podman-compose`, `podman compose`, `docker compose`, puis `docker-compose`. Aucune hypothèse "Docker obligatoire" n'est faite.
 * **Spécificités Fedora / SELinux :** les montages de bind utilisent l'option `:z` afin d'étiqueter correctement les volumes pour SELinux.
-* **Volume des dépendances :** un volume nommé `backend_node_modules` est monté sur `/app/node_modules`. Le bind du code source (`./backend:/app`) ne masque donc plus les dépendances installées dans l'image.
-* **Configuration :** un fichier central `compose.yaml` décrit les services, les réseaux internes et les ports exposés (`API_PORT`, `DB_PORT`).
-* **Santé des services :** la base expose un `healthcheck` (`pg_isready`) et l'API une sonde `GET /health`. `start.sh` attend réellement la réponse de l'API avant d'annoncer le succès.
-* **Arrêt propre :** `Ctrl-C` stoppe Expo puis exécute `compose down` (traps `EXIT INT TERM HUP`). Les ports `3000/5432/8081` sont libérés.
+* **Volume des dépendances :** des volumes nommés `backend_node_modules` et `harvester_node_modules` sont montés sur `/app/node_modules`. Les binds de code source (`./backend:/app`, `./harvester:/app`) ne masquent donc plus les dépendances installées dans l'image.
+* **Configuration :** un fichier central `compose.yaml` décrit les services (`backend`, `harvester`, `redis`, `database`), les réseaux internes et les ports exposés (`API_PORT`, `DB_PORT`, `REDIS_PORT`, `HARVESTER_PORT`).
+* **Harvester :** worker Node.js/BullMQ qui dépile les jobs par fournisseur, applique le rate-limiting, valide avec Zod et upserte dans PostgreSQL/PostGIS. Son schéma Drizzle est lu depuis `backend/src/db`, monté en lecture seule.
+* **Redis :** files et verrous du harvester, persistés dans `./data/redis` avec `appendonly yes` et étiquette SELinux `:z`.
+* **Santé des services :** la base expose un `healthcheck` (`pg_isready`), Redis un `redis-cli ping`, l'API et le harvester une sonde `GET /health`. `start.sh` attend réellement la réponse de l'API avant d'annoncer le succès.
+* **Arrêt propre :** `Ctrl-C` stoppe Expo puis exécute `compose down` (traps `EXIT INT TERM HUP`). Les ports `3000/5432/6379/3001/8081` sont libérés.
 * **Persistance & Sauvegarde :** les données PostgreSQL résident dans `./data/postgres` (bind monté). Les sauvegardes s'effectuent par `pg_dump` compressé ou snapshot du volume. En rootless, les fichiers appartiennent à l'UID mappé du conteneur : les inspecter ou les réinitialiser avec `podman unshare` (`podman unshare rm -rf data/postgres`), jamais avec `sudo chown`.
 
 ### **Commande de lancement**
@@ -130,11 +132,12 @@ Tout appel sortant suit cet ordre strict :
 
 1. Lire l'état **serveur** et la **base de données locale** (donnée déjà connue, fraîcheur, relations).
 2. Servir immédiatement la donnée locale si elle est valide.
-3. Sinon, interroger l'API externe **une seule fois**.
-4. **Normaliser** la réponse (types, unités, coordonnées WGS 84, libellés, langues).
-5. **Persister immédiatement** le résultat en base (upsert idempotent) avant de le renvoyer.
-6. **Compléter les entités enfants** : lorsqu'une requête porte sur un objet, toutes les requêtes nécessaires à ses objets enfants (détails, relations, sous-ressources) sont effectuées pour enrichir la donnée précédente.
-7. Retourner au client une vue **réordonnée et adaptée à l'interface**, de manière asynchrone.
+3. Sinon, **pousser un job dans Redis** et renvoyer `202 Accepted` (ou un cache périmé en stale-while-revalidate).
+4. Le **harvester** interroge l'API externe **une seule fois**, en respectant le débit du fournisseur.
+5. **Normaliser** la réponse (types, unités, coordonnées WGS 84, libellés, langues).
+6. **Persister immédiatement** le résultat en base (upsert idempotent) avant de le renvoyer.
+7. **Compléter les entités enfants** : lorsqu'une requête porte sur un objet, toutes les requêtes nécessaires à ses objets enfants (détails, relations, sous-ressources) sont programmées dans les files secondaires.
+8. Retourner au client une vue **réordonnée et adaptée à l'interface**, de manière asynchrone.
 
 ### **8.3 Persistance obligatoire des métadonnées**
 
@@ -169,9 +172,12 @@ Chaque grande fonctionnalité possède un document dédié et précis dans [`doc
 
 | Document | Fonctionnalité |
 | :---- | :---- |
+| [`docs/sommaire_projet.md`](./docs/sommaire_projet.md) | Vue d'ensemble du projet et carte documentaire |
+| [`docs/sommaire_docs.md`](./docs/sommaire_docs.md) | Index complet et parcours de lecture |
 | [`docs/launcher.md`](./docs/launcher.md) | Bootstrap automatique, installation des dépendances, lancement et arrêt |
 | [`docs/api-cache.md`](./docs/api-cache.md) | Appels API, normalisation, sauvegarde en base, hydratation des enfants |
-| [`docs/object-model.md`](./docs/object-model.md) | Structure des objets et modules d'affichage réutilisables |
+| [`docs/harvester.md`](./docs/harvester.md) | Worker asynchrone, files, rate-limiting, ACL et adaptateurs |
+| [`docs/object-model.md`](./docs/object-model.md) | Structure des objets, EAV, machine à états et modules réutilisables |
 | [`docs/spa-offline.md`](./docs/spa-offline.md) | SPA, menus, chargement asynchrone et mode hors-ligne |
 
 Le modèle obligatoire (objectif, flux, structures, modules, erreurs, tests, fichiers, statut) et le cycle de mise à jour sont définis dans [`docs/README.md`](./docs/README.md). **À chaque fin de session, les documents de fonctionnalité, `stack_universelle.md` et `avancement_projet.md` doivent être synchronisés.**

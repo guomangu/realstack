@@ -10,7 +10,7 @@ Permettre à un développeur ou à un agent IA de cloner le dossier et de lancer
 
 ## 2. Portée et non-objectifs
 
-- **Inclus :** détection et installation des dépendances système, création de `.env`, préparation des volumes, démarrage de PostgreSQL/PostGIS, de l'API Hono et d'Expo, arrêt propre.
+- **Inclus :** détection et installation des dépendances système, création de `.env`, préparation des volumes, démarrage de PostgreSQL/PostGIS, de Redis, du harvester, de l'API Hono et d'Expo, arrêt propre.
 - **Exclus :** déploiement en production, configuration d'un domaine, compilation EAS, gestion des secrets de production.
 
 ## 3. Flux d'exécution
@@ -36,6 +36,10 @@ Permettre à un développeur ou à un agent IA de cloner le dossier et de lancer
 | `API_HEALTH_TIMEOUT` | Délai maximal d'attente de `/health` (s) | `300` |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Identifiants PostgreSQL | valeurs de développement |
 | `DB_PORT` | Port PostgreSQL exposé | `5432` |
+| `REDIS_PORT` | Port Redis exposé | `6379` |
+| `REDIS_URL` | Connexion Redis du harvester | `redis://redis:6379` |
+| `HARVESTER_PORT` | Sonde `/health` du harvester | `3001` |
+| `HARVESTER_ENABLE_EXAMPLE` | Active les adaptateurs de démonstration | `0` |
 
 ## 5. Modules réutilisables
 
@@ -43,7 +47,7 @@ Permettre à un développeur ou à un agent IA de cloner le dossier et de lancer
 | :---- | :---- |
 | `scripts/ensure-dependencies.sh` | Installation idempotente des paquets système et politique d'élévation. |
 | `scripts/prepare-environment.sh` | `.env`, données locales, dépendances npm et environnement public Expo. |
-| `compose.yaml` | Services backend/PostGIS, volumes, santé et commande de développement. |
+| `compose.yaml` | Services backend, harvester, Redis et PostGIS, volumes, santé et commande de développement. |
 
 ## 6. Élévation de privilèges
 
@@ -62,6 +66,7 @@ Si aucun mécanisme ne fonctionne, le script affiche une instruction d'élévati
 - **Paquet introuvable :** message avec la liste des paquets et le gestionnaire détecté.
 - **Podman ne répond pas :** arrêt avant toute modification, avec invitation à vérifier `podman info` et les entrées `/etc/subuid` / `/etc/subgid`.
 - **API non saine :** affichage de l'état des services et des 40 dernières lignes de **tous** les services (la base peut être encore en cours d'initialisation, le backend n'ayant alors aucun journal), puis arrêt et nettoyage.
+- **Harvester :** Compose vérifie sa sonde `GET /health` sur `:3001`. `start.sh` ne bloque que sur l'API ; en cas d'échec du worker, ses journaux apparaissent dans la sortie de diagnostic ci-dessus.
 - **Premier lancement :** l'initialisation de PostgreSQL/PostGIS peut dépasser 90 s ; le délai par défaut de 300 s (`API_HEALTH_TIMEOUT`) en tient compte.
 - **Frontend :** `npm ci` puis repli sur `npm install` ; toute erreur npm interrompt le lancement.
 - **Arrêt :** `down` est exécuté même si Expo ou l'API s'arrête brutalement (traps `EXIT INT TERM HUP`).
@@ -91,6 +96,10 @@ Si aucun mécanisme ne fonctionne, le script affiche une instruction d'élévati
 - `backend/Dockerfile`
 - `backend/docker-entrypoint.sh`
 - `backend/src/index.ts` (sonde `/health`)
+- `backend/src/db/schema.ts` (schéma partagé)
+- `harvester/Dockerfile`
+- `harvester/docker-entrypoint.sh`
+- `harvester/src/index.ts` (sonde `/health`)
 
 ## 11. Prochaines étapes
 

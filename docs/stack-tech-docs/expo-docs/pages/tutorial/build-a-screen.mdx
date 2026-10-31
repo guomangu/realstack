@@ -1,0 +1,639 @@
+---
+title: Build a screen
+description: In this tutorial, learn how to use components such as React Native's Pressable, Expo Image, and Expo UI to build a screen.
+hasVideoLink: true
+---
+
+import { Collapsible } from '~/ui/components/Collapsible';
+import { ContentSpotlight } from '~/ui/components/ContentSpotlight';
+import { FileTree } from '~/ui/components/FileTree';
+import { ProgressTracker } from '~/ui/components/ProgressTracker';
+import { Terminal } from '~/ui/components/Snippet';
+import { Step } from '~/ui/components/Step';
+import { CODE } from '~/ui/components/Text';
+import { VideoBoxLink } from '~/ui/components/VideoBoxLink';
+
+In this chapter, we'll create the first screen of the StickerSmash app.
+
+<ContentSpotlight
+  alt="Initial layout of the StickerSmash app."
+  src="/static/images/tutorial/build-a-screen-initial-layout.webp"
+  className="max-w-[300px]"
+/>
+
+The screen above displays an image and two buttons. The app user can select an image using one of the two buttons. The first button allows the user to select an image from their device. The second button allows the user to continue with a default image provided by the app.
+
+Once the user selects an image, they can add a sticker to it. So, let's start creating this screen.
+
+<VideoBoxLink
+  videoId="3rcOP8xDwTQ"
+  title="Watch: Building a screen in your universal Expo app"
+  description="Build the StickerSmash app's first screen using Pressable, Expo Image, and other core components to create an image picker layout."
+/>
+
+---
+
+<Step label="1">
+
+## Break down the screen
+
+Before we build this screen by writing code, let's break it down into some essential elements.
+
+<ContentSpotlight
+  alt="Breakdown of the initial layout."
+  src="/static/images/tutorial/build-a-screen-breakdown-of-layout.webp"
+  className="max-w-[300px]"
+/>
+
+There are two essential elements:
+
+- A large image in the top half of the screen
+- Two buttons in the bottom half of the screen
+
+The first button contains multiple components. It has a yellow background. It contains an icon and a text component inside a row.
+
+<ContentSpotlight
+  alt="Breakdown of the first button: an icon and a text component on a yellow background."
+  src="/static/images/tutorial/build-a-screen-breakdown-of-buttons.webp"
+  className="max-w-[400px]"
+/>
+
+Now that we've broken down the UI into smaller chunks, we're ready to start coding.
+
+</Step>
+
+<Step label="2">
+
+## Display the image
+
+We'll use `expo-image` library to display the image in the app. It provides a cross-platform `<Image>` component to load and render an image. It is already included in the default project template we're using.
+
+The Image component takes the source of an image as its value. The source can be either a [static asset](https://reactnative.dev/docs/images#static-image-resources) or a URL. For example, the source required from **assets/images** directory is static. It can also come from [Network](https://reactnative.dev/docs/images#network-images) as a `uri` property.
+
+<ContentSpotlight
+  alt="Background image that we are going to use as a placeholder for the tutorial."
+  src="/static/images/tutorial/background-image.webp"
+  className="max-w-[250px]"
+/>
+
+To use the Image component in **src/app/(tabs)/index.tsx** file:
+
+1. Import `Image` from the `expo-image` library.
+2. Create a `PlaceholderImage` variable to use **assets/images/background-image.png** file as the `source` prop on the `Image` component.
+3. Replace the outer `View` with `SafeAreaView` from `react-native-safe-area-context`. Native tabs don't add a header, so `SafeAreaView` keeps the screen content below the status bar on Android and iOS. The default template includes this library.
+4. Add a `paddingTop` to the image container with [`Platform.select()`](https://reactnative.dev/docs/platform#select). On web, the tab list sits at the top of the page, so the image needs more space there.
+
+{/* prettier-ignore */}
+```tsx src/app/(tabs)/index.tsx|collapseHeight=380
+import { Platform, View, StyleSheet } from 'react-native';
+/* @tutinfo Import the `Image` component. */ import { Image } from 'expo-image'; /* @end */
+/* @tutinfo Import the `SafeAreaView` component. It replaces the outer `View`. */ import { SafeAreaView } from 'react-native-safe-area-context'; /* @end */
+
+/* @tutinfo Import the image from the "assets/images/" directory. Since this picture is a static resource, you have to reference it using `require`. */
+const PlaceholderImage = require('@/assets/images/background-image.png');
+/* @end */
+
+export default function Index() {
+  return (
+    <SafeAreaView style={styles.container}>
+      /* @tutinfo Wrap the `Image` component inside a container. Also, add the image component to display the placeholder image. */
+      <View style={styles.imageContainer}>
+        <Image source={PlaceholderImage} style={styles.image} />
+      </View>
+      /* @end */
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
+    /* @tutinfo Modify container styles to remove `justifyContent` property. */
+    alignItems: 'center',
+    /* @end */
+  },
+  /* @tutinfo Add styles for the image container and image. `Platform.select()` returns `20` on Android and iOS, and `96` on web. */
+  imageContainer: {
+    flex: 1,
+    paddingTop: Platform.select({ web: 96, default: 20 }),
+  },
+  image: {
+    width: 320,
+    height: 440,
+    borderRadius: 18,
+  },
+  /* @end */
+});
+```
+
+</Step>
+
+<Step label="3">
+
+## Divide components into files
+
+Let's divide the code into multiple files as we add more components to this screen. Throughout this tutorial, we'll use the components directory to create custom components.
+
+1. Create a **components** directory inside **src**, and inside it, create the **image-viewer.tsx** file.
+2. Move the code to display the image in this file along with the `image` styles.
+
+{/* prettier-ignore */}
+```tsx src/components/image-viewer.tsx|collapseHeight=280
+import { StyleSheet } from 'react-native';
+import { Image, type ImageSource } from 'expo-image';
+
+type Props = {
+  /* @tutinfo The `ImageSource` type from `expo-image` describes the values that the `source` prop accepts. */imgSource: ImageSource;/* @end */
+};
+
+export default function ImageViewer({ imgSource }: Props) {
+  return <Image source={imgSource} style={styles.image} />;
+}
+
+const styles = StyleSheet.create({
+  image: {
+    width: 320,
+    height: 440,
+    borderRadius: 18,
+  },
+});
+```
+
+> **info** Since **ImageViewer** is a custom component, we are placing it in a separate directory instead of the **src/app** directory. Every file inside **src/app** directory is either a layout file or a route file. For more information, see [Non-navigation components live outside the src/app directory](/router/basics/core-concepts/#6-non-navigation-components-live-outside-the-srcapp-directory).
+
+Import `ImageViewer` and use it in the **src/app/(tabs)/index.tsx**:
+
+{/* prettier-ignore */}
+```tsx src/app/(tabs)/index.tsx|collapseHeight=320
+import { Platform, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+/* @tutinfo */import ImageViewer from '@/components/image-viewer'; /* @end */
+
+const PlaceholderImage = require('@/assets/images/background-image.png');
+
+export default function Index() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.imageContainer}>
+        /* @tutinfo Replace `Image` component with `ImageViewer`. */
+        <ImageViewer imgSource={PlaceholderImage} />
+        /* @end */
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    flex: 1,
+    paddingTop: Platform.select({ web: 96, default: 20 }),
+  },
+});
+```
+
+<Collapsible summary={<>What is the <CODE>@</CODE> in import statement?</>}>
+
+The `@` symbol is a custom [path alias](/guides/typescript/#path-aliases-optional) for importing custom components and other modules instead of relative paths. Expo CLI automatically configures it in **tsconfig.json**.
+
+</Collapsible>
+
+</Step>
+
+<Step label="4">
+
+## Create buttons using Pressable
+
+React Native includes a few different components for handling touch events, but [`<Pressable>`](https://reactnative.dev/docs/pressable) is recommended for its flexibility. It can detect single taps, long presses, trigger separate events when the button is pushed in and released, and more.
+
+In the design, there are two buttons we need to create. Each has a different style and label. Let's start by creating a reusable component for these buttons. Create a **button.tsx** file inside the **src/components** directory with the following code:
+
+{/* prettier-ignore */}
+```tsx src/components/button.tsx|collapseHeight=280
+import { StyleSheet, View, Pressable, Text } from 'react-native';
+
+type Props = {
+  label: string;
+  /* @tutinfo The screen that renders the button passes a function to run on each press. */onPress?: () => void;/* @end */
+};
+
+export default function Button({ label, onPress }: Props) {
+  return (
+    <View style={styles.buttonContainer}>
+      <Pressable style={styles.button} onPress={onPress}>
+        <Text style={styles.buttonLabel}>{label}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  buttonContainer: {
+    width: 320,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  button: {
+    height: 48,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  buttonLabel: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});
+```
+
+The `onPress` prop lets the screen decide what happens when the user presses the button. Let's import this component into the **src/app/(tabs)/index.tsx** file. Pass each button an `onPress` function that calls `alert()`. Then, add styles for the `<View>` that encapsulates the buttons:
+
+{/* prettier-ignore */}
+```tsx src/app/(tabs)/index.tsx
+import { Platform, View, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+/* @tutinfo */import Button from '@/components/button'; /* @end */
+import ImageViewer from '@/components/image-viewer';
+
+const PlaceholderImage = require('@/assets/images/background-image.png');
+
+export default function Index() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.imageContainer}>
+        <ImageViewer imgSource={PlaceholderImage} />
+      </View>
+      /* @tutinfo Use the reusable `Button` component to create two buttons and encapsulate them inside a `View` component. */
+      <View style={styles.footerContainer}>
+        <Button label="Choose a photo" onPress={() => alert('You pressed a button.')} />
+        <Button label="Use this photo" onPress={() => alert('You pressed a button.')} />
+      </View>
+      /* @end */
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    flex: 1,
+    paddingTop: Platform.select({ web: 96, default: 20 }),
+  },
+  /* @tutinfo Add the following styles. */
+  footerContainer: {
+    flex: 1 / 3,
+    alignItems: 'center',
+  },
+  /* @end */
+});
+```
+
+The app displays an alert when the user taps any of the buttons on the screen. Let's take a look at our app on Android, iOS, and web:
+
+<ContentSpotlight
+  alt="The image and two buttons on Android, iOS, and web."
+  src="/static/images/tutorial/build-a-screen-buttons-created.webp"
+  className="max-w-[720px]"
+/>
+
+The second button with the label "Use this photo" resembles the actual button from the design. However, the first button needs more styling to match the design.
+
+</Step>
+
+<Step label="5">
+
+## Enhance the reusable button component
+
+The "Choose a photo" button requires different styling than the "Use this photo" button. Let's add a `theme` prop to apply a `primary` theme to it. This button also has an icon before the label. We will use the `SymbolView` component from [`expo-symbols`](/versions/latest/sdk/symbols/) to display it. On Android and web, `SymbolView` displays a [Material Symbols](https://fonts.google.com/icons) icon. On iOS, it displays an [SF Symbols](https://developer.apple.com/sf-symbols/) icon. The default template already includes `expo-symbols`.
+
+Modify **src/components/button.tsx** to add the following code snippet:
+
+{/* prettier-ignore */}
+```tsx src/components/button.tsx
+import { StyleSheet, View, Pressable, Text } from 'react-native';
+/* @tutinfo Import SymbolView. */import { SymbolView } from 'expo-symbols';/* @end */
+
+type Props = {
+  label: string;
+  /* @tutinfo Add theme prop. */theme?: 'primary';/* @end */
+  onPress?: () => void;
+};
+
+export default function Button({ label, /* @tutinfo The prop `theme` to detect the button variant. */theme/* @end */, onPress }: Props) {
+  /* @tutinfo Conditionally render the primary themed button. */
+  if (theme === 'primary') {
+  /* @end */
+  /* @tutinfo */
+    return (
+      <View style={styles.buttonContainer}>
+        <Pressable style={[styles.button, styles.primaryButton]} onPress={onPress}>
+          <SymbolView
+            name={{ ios: 'photo', android: 'image', web: 'image' }}
+            size={18}
+            tintColor="#25292e"
+          />
+          <Text style={[styles.buttonLabel, { color: '#25292e' }]}>{label}</Text>
+        </Pressable>
+      </View>
+    );
+  /* @end */
+  /* @tutinfo */
+  }
+  /* @end */
+
+  return (
+    <View style={styles.buttonContainer}>
+      <Pressable style={styles.button} onPress={onPress}>
+        <Text style={styles.buttonLabel}>{label}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  buttonContainer: {
+    width: 320,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  button: {
+    height: 48,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  /* @tutinfo Add a style for the primary theme. */
+  primaryButton: {
+    backgroundColor: '#ffd33d',
+  },
+  /* @end */
+  buttonLabel: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});
+```
+
+Let's learn what the above code does:
+
+- The primary theme button passes an array to the `style` prop of `<Pressable>`. React Native applies the styles in order, so the `backgroundColor` from `styles.primaryButton` applies only to the primary button.
+- The label of the primary button uses an **inline style**, an object passed directly in the `style` prop. It changes the label color to `#25292e` and overrides the `color` from `styles.buttonLabel`.
+- The `name` prop of `SymbolView` takes an icon name for each platform: `image` for Android and web, and `photo` for iOS.
+
+Now, modify the **src/app/(tabs)/index.tsx** file to use the `theme="primary"` prop on the first button.
+
+{/* prettier-ignore */}
+```tsx src/app/(tabs)/index.tsx
+import { Platform, View, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import Button from '@/components/button';
+import ImageViewer from '@/components/image-viewer';
+
+const PlaceholderImage = require('@/assets/images/background-image.png');
+
+export default function Index() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.imageContainer}>
+        <ImageViewer imgSource={PlaceholderImage} />
+      </View>
+      <View style={styles.footerContainer}>
+        /* @tutinfo Add `"primary"` theme on the first button. */
+        <Button
+          theme="primary"
+          label="Choose a photo"
+          onPress={() => alert('You pressed a button.')}
+        />
+        /* @end */
+        <Button label="Use this photo" onPress={() => alert('You pressed a button.')} />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    flex: 1,
+    paddingTop: Platform.select({ web: 96, default: 20 }),
+  },
+  footerContainer: {
+    flex: 1 / 3,
+    alignItems: 'center',
+  },
+});
+```
+
+Let's take a look at our app on Android, iOS, and web:
+
+<ContentSpotlight
+  alt="The primary button with an icon and a yellow background on Android, iOS, and web."
+  src="/static/images/tutorial/build-a-screen-primary-button.webp"
+  className="max-w-[720px]"
+/>
+
+</Step>
+
+<Step label="6">
+
+## Use native buttons with Expo UI
+
+Our button uses React Native components, so it looks the same on every platform. [Expo UI](/versions/latest/sdk/ui/) provides native components: Jetpack Compose views on Android and SwiftUI views on iOS. The default template already includes Expo UI (`@expo/ui`). Expo UI works in Expo Go.
+
+Let's replace the button on Android and iOS with a native button, and keep the React Native button for web. To do this, we'll use platform-specific extensions. When **button.android.tsx** and **button.ios.tsx** exist next to **button.tsx**, Metro uses the file for the current platform when we import `@/components/button`. Web still uses **button.tsx**. For more information, see [Platform-specific extensions](/router/advanced/platform-specific-modules/#platform-specific-extensions).
+
+The Android button displays an icon from [`@expo/material-symbols`](https://www.npmjs.com/package/@expo/material-symbols), a set of Material Symbols icons for Jetpack Compose. To install it, stop the development server by pressing <kbd>Ctrl</kbd> + <kbd>C</kbd> in the terminal, then run the following command:
+
+<Terminal
+  cmd={{
+    npm: ['$ npx expo install @expo/material-symbols'],
+    yarn: ['$ yarn expo install @expo/material-symbols'],
+    pnpm: ['$ pnpm expo install @expo/material-symbols'],
+    bun: ['$ bun expo install @expo/material-symbols'],
+  }}
+/>
+
+Keep the development server stopped until both new files exist. If you add them while the server is running, Metro can keep using **button.tsx**. In that case, restart the server.
+
+Create a **button.android.tsx** file inside the **src/components** directory:
+
+{/* prettier-ignore */}
+```tsx src/components/button.android.tsx
+import { StyleSheet, View } from 'react-native';
+/* @tutinfo Import Jetpack Compose components from Expo UI. */import { Host, Button as ComposeButton, TextButton, Icon, Row, Text } from '@expo/ui/jetpack-compose';/* @end */
+
+type Props = {
+  label: string;
+  theme?: 'primary';
+  onPress?: () => void;
+};
+
+export default function Button({ label, theme, onPress }: Props) {
+  if (theme === 'primary') {
+    return (
+      <View style={styles.buttonContainer}>
+        /* @tutinfo The `colors` prop sets the container and content colors of the button. `Row` places the icon and the label next to each other, with 8 dp of space between them. */
+        <Host matchContents>
+          <ComposeButton
+            onClick={onPress}
+            colors={{ containerColor: '#ffd33d', contentColor: '#25292e' }}>
+            <Row verticalAlignment="center" horizontalArrangement={{ spacedBy: 8 }}>
+              <Icon source={require('@expo/material-symbols/image.xml')} size={18} tint="#25292e" />
+              <Text color="#25292e">{label}</Text>
+            </Row>
+          </ComposeButton>
+        </Host>
+        /* @end */
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.buttonContainer}>
+      <Host matchContents>
+        /* @tutinfo `TextButton` displays a button with no background. */
+        <TextButton onClick={onPress} colors={{ contentColor: '#fff' }}>
+          <Text color="#fff">{label}</Text>
+        </TextButton>
+        /* @end */
+      </Host>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  buttonContainer: {
+    width: 320,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+```
+
+<Collapsible summary={<>What is <CODE>Host</CODE>?</>}>
+
+`Host` is the bridge between React Native and Expo UI. Jetpack Compose components on Android and SwiftUI components on iOS render only inside a `Host`. The `matchContents` prop sizes the `Host` to fit its content, which is the button here. For more information, see `Host` for [Jetpack Compose](/versions/latest/sdk/ui/jetpack-compose/host/) and [SwiftUI](/versions/latest/sdk/ui/swift-ui/host/).
+
+</Collapsible>
+
+Then, create a **button.ios.tsx** file inside the **src/components** directory:
+
+{/* prettier-ignore */}
+```tsx src/components/button.ios.tsx
+import { StyleSheet, View } from 'react-native';
+/* @tutinfo Import SwiftUI components and modifiers from Expo UI. */
+import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
+import { buttonStyle, controlSize, foregroundStyle, tint } from '@expo/ui/swift-ui/modifiers';
+/* @end */
+
+type Props = {
+  label: string;
+  theme?: 'primary';
+  onPress?: () => void;
+};
+
+export default function Button({ label, theme, onPress }: Props) {
+  if (theme === 'primary') {
+    return (
+      <View style={styles.buttonContainer}>
+        <Host matchContents>
+          /* @tutinfo `systemImage` displays an SF Symbols icon before the label. Modifiers change the style of the button. `tint` sets the button color, and `foregroundStyle` sets the color of the icon and label. */
+          <SwiftUIButton
+            label={label}
+            systemImage="photo"
+            onPress={onPress}
+            modifiers={[
+              buttonStyle('borderedProminent'),
+              controlSize('large'),
+              tint('#ffd33d'),
+              foregroundStyle('#25292e'),
+            ]}
+          />
+          /* @end */
+        </Host>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.buttonContainer}>
+      <Host matchContents>
+        /* @tutinfo `borderless` displays the button with no background. */
+        <SwiftUIButton
+          label={label}
+          onPress={onPress}
+          modifiers={[buttonStyle('borderless'), controlSize('large'), foregroundStyle('#fff')]}
+        />
+        /* @end */
+      </Host>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  buttonContainer: {
+    width: 320,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+```
+
+<Collapsible summary="What are modifiers?">
+
+Modifiers customize the appearance and behavior of Expo UI components, such as their style, size, and colors. Import them from `@expo/ui/jetpack-compose/modifiers` for Jetpack Compose and from `@expo/ui/swift-ui/modifiers` for SwiftUI. Then, pass them in an array to the `modifiers` prop of a component, as **button.ios.tsx** does. For more information, see modifiers for [Jetpack Compose](/versions/latest/sdk/ui/jetpack-compose/modifiers/) and [SwiftUI](/versions/latest/sdk/ui/swift-ui/modifiers/).
+
+</Collapsible>
+
+Both files keep the same props as **button.tsx**, so **src/app/(tabs)/index.tsx** doesn't change. The **src/components** directory now contains three versions of the button:
+
+<FileTree
+  files={[
+    ['src/components/button.android.tsx', 'Used on Android'],
+    ['src/components/button.ios.tsx', 'Used on iOS'],
+    ['src/components/button.tsx', 'Used on web'],
+    ['src/components/image-viewer.tsx'],
+  ]}
+/>
+
+<Collapsible summary={<>Why do we keep <CODE>button.tsx</CODE>?</>}>
+
+Web uses **button.tsx**, because there is no **button.web.tsx** file. TypeScript also reads the types of `@/components/button` from **button.tsx**. So all three files must accept the same props.
+
+</Collapsible>
+
+Start the development server again by running `npx expo start`. Let's take a look at our app on Android, iOS, and web:
+
+<ContentSpotlight file="tutorial/build-a-screen-complete-layout.mp4" />
+
+</Step>
+
+## Summary
+
+<ProgressTracker name="GET_STARTED" currentChapterSlug="/tutorial/build-a-screen" />

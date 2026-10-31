@@ -23,6 +23,57 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  harvester:
+    # Contexte racine : le schéma Drizzle partagé vit dans backend/src/db.
+    build:
+      context: .
+      dockerfile: harvester/Dockerfile
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres_password@database:5432/universal_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - NODE_ENV=${NODE_ENV:-development}
+      - HARVESTER_PORT=${HARVESTER_PORT:-3001}
+      - HARVESTER_DB_POOL=${HARVESTER_DB_POOL:-5}
+      - HARVESTER_ENABLE_EXAMPLE=${HARVESTER_ENABLE_EXAMPLE:-0}
+      - HARVESTER_EXAMPLE_URL=${HARVESTER_EXAMPLE_URL:-}
+    volumes:
+      - ./harvester:/app:z
+      - harvester_node_modules:/app/node_modules
+      # Source unique de vérité du schéma : le dossier backend est monté en
+      # lecture seule et lu par src/db/schema.ts via /app/shared-db.
+      - ./backend/src/db:/app/shared-db:ro,z
+    command: ["sh", "/app/docker-entrypoint.sh", "npm", "run", "dev"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      # :z garantit l'étiquetage SELinux en rootless.
+      - ./data/redis:/data:z
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   database:
     image: docker.io/postgis/postgis:16-3.4
@@ -45,3 +96,4 @@ services:
 
 volumes:
   backend_node_modules:
+  harvester_node_modules:

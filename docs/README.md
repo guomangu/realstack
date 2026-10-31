@@ -4,17 +4,29 @@
 
 Ce document est l'index de référence. Il doit être mis à jour à chaque fin de session de développement.
 
+## Commencer ici
+
+- [`sommaire_projet.md`](./sommaire_projet.md) — vision, architecture, composants, démarrage rapide.
+- [`sommaire_docs.md`](./sommaire_docs.md) — index complet et parcours de lecture.
+
 ## Index
 
 | Document | Fonctionnalité | Statut |
 | :---- | :---- | :---- |
 | [`launcher.md`](./launcher.md) | Bootstrap automatique, installation des dépendances, lancement et arrêt propre | Implémenté |
 | [`api-cache.md`](./api-cache.md) | Appels aux API externes, normalisation, sauvegarde en base, hydratation des enfants | Spécification |
-| [`object-model.md`](./object-model.md) | Structure canonique des objets et modules UI réutilisables | Spécification |
+| [`harvester.md`](./harvester.md) | Worker asynchrone : files, rate-limiting, ACL, cache brut, upsert PostGIS | Socle implémenté |
+| [`object-model.md`](./object-model.md) | Structure canonique des objets, EAV, machine à états et hiérarchies | Spécification |
 | [`spa-offline.md`](./spa-offline.md) | Structure de la SPA, menus, chargement asynchrone et mode hors-ligne | Spécification |
-| [Architecture d'enrichissement API](../architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) | Optimisations avancées : ETag / `If-None-Match`, negative caching, filtre de Bloom, merge non destructif, `external_mirror` | Document de référence (racine) |
+| [`bon_ux_ui.md`](./bon_ux_ui.md) | Charte UX/UI, accessibilité et sobriété visuelle | Obligatoire |
+| [`bonne_pratique.md`](./bonne_pratique.md) | Règles de développement pour agents IA et humains | Obligatoire |
+| [`mauvaise_pratique.md`](./mauvaise_pratique.md) | Registre des erreurs et anti-patterns | Obligatoire |
+| [`Spécification Technique du Conteneur Harvester.md`](./Spécification%20Technique%20du%20Conteneur%20Harvester.md) | Spécification d'origine du worker | Référence |
+| [`architecture_syst_me_appels_api_et_sauvegarde_intelligente.md`](./architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) | Optimisations avancées : ETag / `If-None-Match`, negative caching, filtre de Bloom, merge non destructif, `external_mirror` | Référence |
+| [`stack_universelle.md`](./stack_universelle.md) | Architecture technique de référence | Référence |
+| [`avancement_projet.md`](./avancement_projet.md) | Étapes réalisées et chantiers restants | Vivant |
 
-> Le document racine d'architecture API complète `api-cache.md` : il détaille les optimisations réseau et le modèle de miroir local. En cas de divergence, aligner les deux documents dans la même session.
+> `api-cache.md` et le document d'architecture API sont complémentaires : le premier décrit le pipeline applicatif, le second les optimisations réseau et le modèle de miroir local. En cas de divergence, aligner les deux documents dans la même session.
 
 ## Modèle obligatoire d'un document de fonctionnalité
 

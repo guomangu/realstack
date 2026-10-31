@@ -3,7 +3,7 @@
 > **Statut :** Spécification — à implémenter
 > **Dernière mise à jour :** 2026-10-25
 > **Objectif :** zéro appel externe superflu, zéro donnée centrale inventée.
-> **Voir aussi :** [Architecture d'enrichissement API](../architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) pour les optimisations ETag / `If-None-Match`, negative caching, filtre de Bloom, déduplication en vol et merge non destructif.
+> **Voir aussi :** [Architecture d'enrichissement API](./architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) pour les optimisations ETag / `If-None-Match`, negative caching, filtre de Bloom, déduplication en vol et merge non destructif.
 
 ## 1. Objectif
 
@@ -26,11 +26,13 @@ Décrire le pipeline unique par lequel toute donnée externe entre dans la plate
 1. **Lecture serveur/base** : vérifier si l'entité et ses relations existent déjà.
 2. **Fraîcheur** : comparer `fetched_at` et `expires_at` (TTL par type).
 3. **Cache local valide** : servir immédiatement, sans réseau.
-4. **Appel externe** : une seule requête réseau, dédupliquée si plusieurs composants demandent la même clé.
+4. **Appel externe asynchrone** : l'API pousse un job dans Redis ; le harvester effectue une seule requête réseau, dédupliquée et limitée par fournisseur.
 5. **Normalisation** : types, unités, langues, coordonnées WGS 84, libellés, identifiants.
 6. **Persistance** : upsert idempotent avant toute réponse.
-7. **Hydratation des enfants** : requêter et persister les sous-ressources, détails et relations.
+7. **Hydratation des enfants** : requêter et persister les sous-ressources, détails et relations via des jobs dépendants.
 8. **Réponse UI** : vue réordonnée, adaptée à l'interface, transmise de façon asynchrone.
+
+> L'implémentation du cycle asynchrone est décrite dans [`harvester.md`](./harvester.md).
 
 ## 5. Structures proposées
 
@@ -49,7 +51,7 @@ Décrire le pipeline unique par lequel toute donnée externe entre dans la plate
 - **TTL différencié** : référentiels stables (long), géocodage (moyen), aperçus (court).
 - **Stale-while-revalidate** : servir le cache expiré, rafraîchir en arrière-plan.
 - **Déduplication en vol** : une seule requête pour plusieurs demandes simultanées de la même clé.
-- **Optimisations réseau complémentaires** : `ETag` / `If-None-Match`, `If-Modified-Since`, negative caching, filtre de Bloom pour les catalogues massifs — voir le [document d'architecture API](../architecture_syst_me_appels_api_et_sauvegarde_intelligente.md).
+- **Optimisations réseau complémentaires** : `ETag` / `If-None-Match`, `If-Modified-Since`, negative caching, filtre de Bloom pour les catalogues massifs — voir le [document d'architecture API](./architecture_syst_me_appels_api_et_sauvegarde_intelligente.md).
 - **Upsert** : `INSERT ... ON CONFLICT DO UPDATE` pour les entités et les relations.
 
 ## 7. Hydratation des enfants
@@ -92,12 +94,15 @@ Décrire le pipeline unique par lequel toute donnée externe entre dans la plate
 - `backend/src/services/normalization/*`
 - `backend/src/services/external-api/*`
 - `backend/src/db/schema.ts`
+- `harvester/src/core/*`
+- `harvester/src/adapters/*`
 - `frontend/src/hooks/use-entity.ts`
 - `frontend/src/components/async-section.tsx`
 
 ## 12. Prochaines étapes
 
-- [ ] Choisir et finaliser l'ORM unique.
-- [ ] Créer les tables de cache et de relations.
-- [ ] Implémenter le service de normalisation et l'upsert.
+- [x] Choisir et finaliser l'ORM unique (Drizzle).
+- [x] Créer les tables de cache (`external_api_cache`) et l'entité `locations`.
+- [x] Mettre en place le socle harvester (files, retry, rate-limit, upsert).
+- [ ] Implémenter les adaptateurs métier réels et la normalisation par source.
 - [ ] Ajouter les indicateurs de complétude et les spinners locaux.

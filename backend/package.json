@@ -9,7 +9,9 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@prisma/client": "^7.10.0",
-    "hono": "^4.13.4"
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.4",
+    "postgres": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

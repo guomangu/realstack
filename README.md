@@ -57,6 +57,8 @@ Une approche qui protège vos utilisateurs sans les ralentir.
 | **Frontend** | Expo / React Native | Rendu natif universel (Web, iOS, Android) |
 | **Routage** | Expo Router | File-based routing, SSR, Deep Linking |
 | **Backend API** | Hono (TypeScript) | Logique métier performante et typée |
+| **Harvester** | Node.js + BullMQ + Zod | Ingestion asynchrone, rate-limiting, normalisation et upsert PostGIS |
+| **Files d'attente** | Redis 7 | Quotas par fournisseur, reprises et idempotence |
 | **ORM** | Drizzle ORM | Mapping relationnel, types partagés |
 | **Base de données** | PostgreSQL 16 | Persistance relationnelle robuste |
 | **Moteur Spatial** | PostGIS | Calculs géographiques et indexation |
@@ -78,7 +80,7 @@ eas build \--platform ios \--profile production
 
 ### **Backend Conteneurisé**
 
-Toute l'infrastructure serveur, la base de données et les volumes géospatiaux sont isolés et pilotés par un fichier compose.yaml central.
+Toute l'infrastructure serveur (API, harvester, Redis, base de données) et les volumes géospatiaux sont isolés et pilotés par un fichier compose.yaml central.
 
 ```bash
 # Lancement automatique : aucune option, aucune installation manuelle
@@ -94,7 +96,7 @@ podman-compose down    # ou : docker compose down
 - détection de `COMPOSE_CMD`, `podman-compose`, `podman compose`, `docker compose`, `docker-compose` ;
 - **installation automatique** des dépendances manquantes (Podman, podman-compose, Node.js 20+, npm, curl) via `dnf`, `apt-get`, `pacman` ou `zypper` ;
 - gestion des droits administrateur testée dans l'ordre `root`, `sudo -n`, `sudo` interactif, `pkexec`, `doas` ;
-- étiquetage SELinux `:z`, volume nommé pour `node_modules`, attente active de `/health`, arrêt propre sur `Ctrl-C` ;
+- étiquetage SELinux `:z`, volumes nommés pour `node_modules`, attente active de `/health`, arrêt propre sur `Ctrl-C` ;
 - génération d'un `frontend/.env` public uniquement (les secrets serveur restent côté backend).
 
 ## **📚 Documentation par Fonctionnalité**
@@ -103,13 +105,16 @@ Chaque grande fonctionnalité possède un document dédié dans [`docs/`](./docs
 
 | Document | Contenu |
 | :---- | :---- |
+| [`docs/sommaire_projet.md`](./docs/sommaire_projet.md) | Vue d'ensemble, architecture, composants et démarrage rapide |
+| [`docs/sommaire_docs.md`](./docs/sommaire_docs.md) | Index complet et parcours de lecture de la documentation |
 | [`docs/launcher.md`](./docs/launcher.md) | Bootstrap des dépendances, lancement automatique et arrêt propre |
 | [`docs/api-cache.md`](./docs/api-cache.md) | Appels API, normalisation, sauvegarde en base, hydratation des enfants |
-| [`docs/object-model.md`](./docs/object-model.md) | Structure des objets et modules d'affichage réutilisables |
+| [`docs/harvester.md`](./docs/harvester.md) | Worker asynchrone, files, rate-limiting et adaptateurs |
+| [`docs/object-model.md`](./docs/object-model.md) | Structure des objets, EAV, machine à états et modules réutilisables |
 | [`docs/spa-offline.md`](./docs/spa-offline.md) | SPA, menus, chargement asynchrone et mode hors-ligne |
 
 Le modèle obligatoire et le cycle de mise à jour sont décrits dans [`docs/README.md`](./docs/README.md).
 
-Le document [Architecture d'enrichissement API](./architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) complète la partie API avec les optimisations avancées : ETag / `If-None-Match`, negative caching, filtre de Bloom, déduplication en vol et merge non destructif.
+Le document [Architecture d'enrichissement API](./docs/architecture_syst_me_appels_api_et_sauvegarde_intelligente.md) complète la partie API avec les optimisations avancées : ETag / `If-None-Match`, negative caching, filtre de Bloom, déduplication en vol et merge non destructif.
 
 *Conçu pour l'échelle. Bâti pour la vitesse.*

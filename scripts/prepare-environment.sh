@@ -30,6 +30,12 @@ POSTGRES_PASSWORD=postgres_password
 POSTGRES_DB=universal_db
 DB_PORT=5432
 DATABASE_URL=postgres://postgres:postgres_password@database:5432/universal_db
+REDIS_PORT=6379
+REDIS_URL=redis://redis:6379
+HARVESTER_PORT=3001
+HARVESTER_DB_POOL=5
+HARVESTER_ENABLE_EXAMPLE=0
+HARVESTER_EXAMPLE_URL=
 AUTH_SECRET=${secret}
 EXPO_PUBLIC_API_URL=http://localhost:3000
 EOF
@@ -59,7 +65,7 @@ load_env() {
     export AUTH_SECRET="$(generate_secret)"
     log "🔐 AUTH_SECRET généré pour cette session (ajoutez-le au .env pour le conserver)."
   fi
-  mkdir -p "$PROJECT_DIR/data/postgres"
+  mkdir -p "$PROJECT_DIR/data/postgres" "$PROJECT_DIR/data/redis"
 }
 
 prepare_frontend() {

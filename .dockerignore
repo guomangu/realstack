@@ -1,0 +1,17 @@
+.git
+.expo
+data
+docs
+frontend
+database
+scripts
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+*.dump
+*.log
+.env
+.env.*
+README.md
+compose.yaml
+start.sh
