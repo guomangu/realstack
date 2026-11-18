@@ -27,8 +27,15 @@ node_ok() {
 }
 
 compose_ok() {
-  command -v podman-compose >/dev/null 2>&1 && podman-compose version >/dev/null 2>&1 && return 0
-  command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1
+  if command -v podman >/dev/null 2>&1; then
+    { command -v podman-compose >/dev/null 2>&1 && podman-compose version >/dev/null 2>&1; } && return 0
+    podman compose version >/dev/null 2>&1 && return 0
+  fi
+  if command -v docker >/dev/null 2>&1; then
+    docker compose version >/dev/null 2>&1 && return 0
+    { command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; } && return 0
+  fi
+  return 1
 }
 
 install_packages() {
@@ -60,13 +67,15 @@ ensure_dependencies() {
   local item need_node=0
 
   command -v curl >/dev/null 2>&1 || missing+=(curl)
-  command -v podman >/dev/null 2>&1 || missing+=(podman)
-  compose_ok || missing+=(podman-compose)
+  if ! compose_ok; then
+    command -v podman >/dev/null 2>&1 || missing+=(podman)
+    missing+=(podman-compose)
+  fi
   node_ok || need_node=1
   { command -v npm && command -v npx; } >/dev/null 2>&1 || need_node=1
 
   if [ "${#missing[@]}" -eq 0 ] && [ "$need_node" -eq 0 ]; then
-    log "✅ Dépendances système présentes (Podman, Node 20+, npm, curl)."
+    log "✅ Dépendances système présentes (moteur Compose, Node 20+, npm, curl)."
     return 0
   fi
 
@@ -77,8 +86,7 @@ ensure_dependencies() {
   done
   if [ "${#pkgs[@]}" -gt 0 ]; then install_packages "${pkgs[@]}" || die "Installez manuellement : ${pkgs[*]}"; fi
   hash -r
-  command -v podman >/dev/null 2>&1 || die "Podman introuvable après installation."
-  compose_ok || die "podman-compose introuvable après installation."
+  compose_ok || die "Aucun moteur de conteneurs Compose (Podman ou Docker) opérationnel après installation."
   node_ok || die "Node.js 20+ requis (Debian/Ubuntu : utilisez NodeSource ou nvm)."
   { command -v npm && command -v npx; } >/dev/null 2>&1 || die "npm/npx introuvable après installation."
   command -v curl >/dev/null 2>&1 || die "curl introuvable après installation."

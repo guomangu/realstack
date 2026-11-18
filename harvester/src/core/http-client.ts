@@ -17,14 +17,15 @@ export class HttpError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly retryAfterMs?: number
+    readonly retryAfterMs?: number,
+    readonly retryable = status === 408 || status === 425 || status >= 500
   ) {
     super(message)
     this.name = 'HttpError'
   }
 }
 
-function parseRetryAfter(value: string | null): number | undefined {
+export function parseRetryAfter(value: string | null): number | undefined {
   if (!value) return undefined
   const seconds = Number(value)
   if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
@@ -39,43 +40,54 @@ function backoff(attempt: number, baseDelayMs: number): number {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+function validateHttpUrl(rawUrl: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw new HttpError(`URL invalide : ${rawUrl}`, 400, undefined, false)
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new HttpError(`Protocole non supporté : ${parsed.protocol}`, 400, undefined, false)
+  }
+}
+
 /**
  * Fetcher résilient : retries exponentiels, timeout, user-agent rotatif et
  * respect de `Retry-After`. Un 429 est renvoyé tel quel pour que le worker
  * puisse geler la file du fournisseur au lieu de marteler l'API.
  */
 export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}): Promise<T> {
+  validateHttpUrl(url)
   const attempts = Math.max(1, options.attempts ?? 4)
   const timeoutMs = options.timeoutMs ?? 15_000
   const baseDelayMs = options.baseDelayMs ?? 500
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
     try {
-      // Un signal neuf par tentative : sinon un timeout consommerait aussi
-      // le budget des retries suivants.
       const timeout = AbortSignal.timeout(timeoutMs)
       const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
-      const response = await fetch(url, {
-        headers: {
-          accept: 'application/json',
-          'user-agent': USER_AGENTS[attempt % USER_AGENTS.length]!,
-          ...options.headers,
-        },
-        signal,
-      })
+      const headers = new Headers(options.headers)
+      if (!headers.has('accept')) headers.set('accept', 'application/json')
+      if (!headers.has('user-agent')) headers.set('user-agent', USER_AGENTS[attempt % USER_AGENTS.length]!)
 
+      const response = await fetch(url, { headers, signal })
       if (response.status === 429) {
-        throw new HttpError('RATE_LIMIT_HIT', 429, parseRetryAfter(response.headers.get('retry-after')))
+        throw new HttpError('RATE_LIMIT_HIT', 429, parseRetryAfter(response.headers.get('retry-after')), false)
       }
       if (!response.ok) {
         throw new HttpError(`HTTP ${response.status} sur ${url}`, response.status)
       }
-      return (await response.json()) as T
+      try {
+        return (await response.json()) as T
+      } catch {
+        throw new HttpError(`Réponse JSON invalide depuis ${url}`, response.status, undefined, false)
+      }
     } catch (error) {
-      const rateLimited = error instanceof HttpError && error.status === 429
-      const clientError =
-        error instanceof HttpError && error.status >= 400 && error.status < 500
-      if (rateLimited || clientError || attempt === attempts) throw error
+      if (options.signal?.aborted) throw error
+      if (error instanceof HttpError && !error.retryable) throw error
+      if (attempt === attempts) throw error
       await sleep(backoff(attempt, baseDelayMs))
     }
   }

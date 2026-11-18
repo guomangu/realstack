@@ -1,6 +1,6 @@
-# Backend (Hono + TypeScript)
+# Backend (Hono + TypeScript + Drizzle)
 
-L'API backend est développée avec [Hono](https://hono.dev/) en TypeScript.
+L'API backend est développée avec [Hono](https://hono.dev/) et **Drizzle ORM** sur PostgreSQL 16 + PostGIS.
 
 ## Lancement
 
@@ -17,15 +17,20 @@ L'API écoute sur `http://localhost:${API_PORT}` (par défaut `3000`).
 
 | Méthode | Route | Description |
 | :---- | :---- | :---- |
-| `GET` | `/` | Message de vérification |
-| `GET` | `/health` | Sonde de disponibilité (utilisée par `start.sh`) |
+| `GET` | `/` | Métadonnées minimales de l'API |
+| `GET` | `/health` | Sonde réelle PostgreSQL + Redis (`200 ok` / `503 degraded`) |
+| `GET` | `/api/locations` | Recherche locale (`q`, `source`, `lat`/`lng`/`radiusKm` PostGIS, `limit <= 200`) |
+| `GET` | `/api/locations/:source/:externalId` | Détail normalisé et fraîcheur `external_api_cache` |
+| `POST` | `/api/harvest/:adapter` | Enfile un job idempotent `{ externalId, parentId? }` dans Redis (`202 Accepted`) |
 
-## Notes techniques
+## Base de données & tests
 
-- Le port est lu depuis `process.env.API_PORT` et doit rester aligné avec `compose.yaml` et `.env`.
-- Le montage `./backend:/app` est complété par le volume nommé `backend_node_modules` : les dépendances installées dans l'image ne sont jamais masquées.
-- En développement, `tsx watch` redémarre automatiquement à chaque modification.
+- Au démarrage, `src/db/migrate.ts` applique les migrations SQL (`src/db/migrations/`) sous verrou consultatif PostgreSQL et active `postgis`.
+- Le montage `./backend:/app:z` est complété par le volume nommé `backend_node_modules`.
+- CORS est configuré via `CORS_ORIGINS` ; `secureHeaders()` protège les réponses HTTP.
 
 ```bash
+npm run typecheck
+npm run test
 podman-compose logs -f backend
 ```

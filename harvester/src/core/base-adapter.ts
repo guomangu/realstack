@@ -39,3 +39,16 @@ export class AdapterError extends Error {
     this.name = 'AdapterError'
   }
 }
+
+/** Lit et valide une URL de base depuis une variable d'environnement. */
+export function requireBaseUrl(envVar: string): string {
+  const raw = process.env[envVar]?.trim()
+  if (!raw) throw new AdapterError(`${envVar} absent`, 'MISSING_CONFIG')
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('protocol')
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    throw new AdapterError(`${envVar} invalide`, 'INVALID_CONFIG')
+  }
+}

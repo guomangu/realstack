@@ -5,7 +5,7 @@ Chaque fichier de ce dossier correspond à **un fournisseur externe** et implém
 ## Règles
 
 - Un adaptateur = un fichier, une responsabilité, moins de 100 lignes.
-- Le nom de l'adaptateur sert de nom de file BullMQ (`harvest:<name>`) : il doit être stable.
+- Le nom de l'adaptateur sert de nom de file BullMQ (`harvest-<name>`) : il doit être stable.
 - Le payload d'un job ne contient que des identifiants (`externalId`, `parentId?`).
 - La réponse brute est validée par Zod avant toute écriture.
 - Le brut est conservé dans `external_api_cache`, puis l'entité est upsertée sur `(source, external_id)`.

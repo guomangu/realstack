@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# Prépare .env, les volumes locaux et l'environnement du frontend.
-# Sourcé par start.sh, ou exécutable : bash scripts/prepare-environment.sh
-# ==============================================================================
+# Prépare .env, les volumes locaux et le frontend (sourcé par start.sh).
 set -euo pipefail
 
 declare -F log >/dev/null 2>&1 || log() { printf '\n\033[1;36m%s\033[0m\n' "$*"; }
@@ -11,10 +8,8 @@ declare -F die >/dev/null 2>&1 || die() { printf '\n\033[1;31m✖ %s\033[0m\n' "
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 generate_secret() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 32
-  else
-    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
+  if command -v openssl >/dev/null 2>&1; then openssl rand -hex 32
+  else head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
   fi
 }
 
@@ -25,6 +20,7 @@ create_default_env() {
 NODE_ENV=development
 API_PORT=3000
 PORT=8081
+CORS_ORIGINS=http://localhost:8081
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres_password
 POSTGRES_DB=universal_db
@@ -42,14 +38,23 @@ EOF
   log "📄 Fichier .env minimal généré."
 }
 
+persist_auth_secret() {
+  local env_file="$PROJECT_DIR/.env" secret
+  secret="$(generate_secret)"
+  export AUTH_SECRET="$secret"
+  if grep -q '^AUTH_SECRET=' "$env_file"; then sed -i "s|^AUTH_SECRET=.*|AUTH_SECRET=${secret}|" "$env_file"
+  else printf '\nAUTH_SECRET=%s\n' "$secret" >> "$env_file"
+  fi
+  log "🔐 AUTH_SECRET aléatoire généré et enregistré dans .env."
+}
+
 load_env() {
   if [ ! -f "$PROJECT_DIR/.env" ]; then
-    if [ -f "$PROJECT_DIR/.env.example" ]; then
-      cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-    else
-      create_default_env
+    if [ -f "$PROJECT_DIR/.env.example" ]; then cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+    else create_default_env
     fi
   fi
+  chmod 600 "$PROJECT_DIR/.env" 2>/dev/null || true
   set -a
   # shellcheck disable=SC1091
   . "$PROJECT_DIR/.env"
@@ -61,9 +66,8 @@ load_env() {
   if [ -z "${DATABASE_URL:-}" ]; then
     export DATABASE_URL="postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@database:5432/${POSTGRES_DB:-universal_db}"
   fi
-  if [ -z "${AUTH_SECRET:-}" ]; then
-    export AUTH_SECRET="$(generate_secret)"
-    log "🔐 AUTH_SECRET généré pour cette session (ajoutez-le au .env pour le conserver)."
+  if [ -z "${AUTH_SECRET:-}" ] || [ "${AUTH_SECRET}" = "super_secret_changeme_for_production" ]; then
+    persist_auth_secret
   fi
   mkdir -p "$PROJECT_DIR/data/postgres" "$PROJECT_DIR/data/redis"
 }
@@ -72,12 +76,11 @@ prepare_frontend() {
   [ -d "$PROJECT_DIR/frontend" ] || die "Dossier frontend introuvable."
   (
     cd "$PROJECT_DIR/frontend"
-    # Seules les variables publiques sont transmises au processus Expo.
     grep -E '^(EXPO_PUBLIC_[A-Za-z0-9_]+|PORT)=' "$PROJECT_DIR/.env" > .env.tmp || true
     mv .env.tmp .env
 
     local marker="node_modules/.package-lock.json"
-    if [ ! -d node_modules ] \
+    if [ ! -d node_modules ] || [ ! -x node_modules/.bin/expo ] \
       || { [ -f package-lock.json ] && [ package-lock.json -nt "$marker" ]; } \
       || [ package.json -nt "$marker" ]; then
       log "📦 Installation des dépendances frontend (npm ci)..."
@@ -92,6 +95,4 @@ prepare_environment() {
   log "✅ Environnement prêt (API=${API_PORT}, Expo=${PORT})."
 }
 
-if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-  prepare_environment
-fi
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then prepare_environment; fi

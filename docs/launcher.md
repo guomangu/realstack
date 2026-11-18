@@ -66,7 +66,8 @@ Si aucun mécanisme ne fonctionne, le script affiche une instruction d'élévati
 - **Paquet introuvable :** message avec la liste des paquets et le gestionnaire détecté.
 - **Podman ne répond pas :** arrêt avant toute modification, avec invitation à vérifier `podman info` et les entrées `/etc/subuid` / `/etc/subgid`.
 - **API non saine :** affichage de l'état des services et des 40 dernières lignes de **tous** les services (la base peut être encore en cours d'initialisation, le backend n'ayant alors aucun journal), puis arrêt et nettoyage.
-- **Harvester :** Compose vérifie sa sonde `GET /health` sur `:3001`. `start.sh` ne bloque que sur l'API ; en cas d'échec du worker, ses journaux apparaissent dans la sortie de diagnostic ci-dessus.
+- **API & Harvester :** `GET /health` vérifie réellement PostgreSQL et Redis sur les deux services ; `start.sh` attend l'API puis contrôle que `harvester` ne s'est pas arrêté avant de lancer Expo.
+- **Secrets :** `prepare-environment.sh` génère un `AUTH_SECRET` aléatoire si absent ou si la valeur d'exemple historique est encore présente.
 - **Premier lancement :** l'initialisation de PostgreSQL/PostGIS peut dépasser 90 s ; le délai par défaut de 300 s (`API_HEALTH_TIMEOUT`) en tient compte.
 - **Frontend :** `npm ci` puis repli sur `npm install` ; toute erreur npm interrompt le lancement.
 - **Arrêt :** `down` est exécuté même si Expo ou l'API s'arrête brutalement (traps `EXIT INT TERM HUP`).

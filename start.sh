@@ -15,17 +15,11 @@ die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 
 [ "$#" -eq 0 ] || die "Aucune option n'est nécessaire : lancez simplement ./start.sh"
 
-# 1. Dépendances système : installation automatique si nécessaire.
-# shellcheck source=scripts/ensure-dependencies.sh
 . "$SCRIPT_DIR/scripts/ensure-dependencies.sh"
 ensure_dependencies
-
-# 2. Environnement, .env, données et dépendances frontend.
-# shellcheck source=scripts/prepare-environment.sh
 . "$SCRIPT_DIR/scripts/prepare-environment.sh"
 prepare_environment
 
-# 3. Détection du moteur Compose.
 detect_compose() {
   if [ -n "${COMPOSE_CMD:-}" ]; then
     read -r -a COMPOSE <<< "$COMPOSE_CMD"
@@ -43,10 +37,8 @@ detect_compose() {
   fi
   log "🐳 Moteur de conteneurs : ${COMPOSE[*]}"
 }
-
 detect_compose
 
-# 4. Infrastructure et nettoyage automatique à l'arrêt.
 STARTED=0
 CLEANED=0
 cleanup() {
@@ -64,36 +56,37 @@ if [ "${COMPOSE[0]}" = "podman" ] || [ "${COMPOSE[0]}" = "podman-compose" ]; the
   podman info >/dev/null 2>&1 || die "Podman ne répond pas. Vérifiez 'podman info' ; en rootless, assurez-vous que /etc/subuid et /etc/subgid contiennent votre utilisateur."
 fi
 
-log "🚀 Démarrage de PostgreSQL/PostGIS et de l'API..."
+log "🚀 Démarrage de PostgreSQL/PostGIS, Redis, API et Harvester..."
 STARTED=1
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" up --build -d
 
-# 5. Attente de la santé de l'API (réponse JSON validée).
-# La première initialisation de PostgreSQL/PostGIS peut durer plusieurs minutes :
-# le backend ne démarre qu'une fois la base déclarée saine (depends_on).
 health_ok() {
   local body
-  body="$(curl -fsS "http://localhost:${API_PORT}/health" 2>/dev/null)" || return 1
-  [[ "$body" == *'"status":"ok"'* ]]
+  body="$(curl -fsS --max-time 2 "http://127.0.0.1:${API_PORT}/health" 2>/dev/null)" || return 1
+  [[ "$body" =~ \"status\"[[:space:]]*:[[:space:]]*\"ok\" ]]
+}
+
+report_failure() {
+  printf '\n⚠️ Service défaillant.\n\nÉtat des services :\n\n'
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
+  printf '\nJournaux récents (tous les services) :\n\n'
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail 40 || true
+  die "Corrigez l'erreur ci-dessus puis relancez ./start.sh."
 }
 
 HEALTH_TIMEOUT="${API_HEALTH_TIMEOUT:-300}"
 HEALTH_INTERVAL=2
 HEALTH_TICKS=$(( HEALTH_TIMEOUT / HEALTH_INTERVAL ))
-printf '⏳ Attente de l’API sur http://localhost:%s/health (max %s s)' "$API_PORT" "$HEALTH_TIMEOUT"
+printf '⏳ Attente de l’API sur http://127.0.0.1:%s/health (max %s s)' "$API_PORT" "$HEALTH_TIMEOUT"
 for _ in $(seq 1 "$HEALTH_TICKS"); do
   health_ok && { echo ' ✔'; break; }
   printf '.'; sleep "$HEALTH_INTERVAL"
 done
-if ! health_ok; then
-  printf '\n⚠️ API indisponible après %s s.\n\nÉtat des services :\n\n' "$HEALTH_TIMEOUT"
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
-  printf '\nJournaux récents (tous les services) :\n\n'
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail 40 || true
-  die "Corrigez l'erreur ci-dessus puis relancez ./start.sh."
+health_ok || report_failure
+if "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps 2>/dev/null | grep -i 'harvester' | grep -qiE 'exited|dead|created'; then
+  report_failure
 fi
 
-# 6. Frontend Expo au premier plan.
 log "📱 Interface universelle : w = Web (SPA), a = Android, i = iOS"
 log "🛑 Ctrl-C pour arrêter Expo et l'infrastructure."
 cd "$SCRIPT_DIR/frontend"

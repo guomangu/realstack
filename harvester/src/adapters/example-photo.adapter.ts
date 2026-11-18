@@ -1,8 +1,7 @@
 import { z } from 'zod'
-import { db } from '../db/client.js'
+import { getDb } from '../db/client.js'
 import { externalApiCache } from '../db/schema.js'
-import { AdapterError } from '../core/base-adapter.js'
-import type { BaseAdapter } from '../core/base-adapter.js'
+import { requireBaseUrl, type BaseAdapter } from '../core/base-adapter.js'
 import { fetchJson } from '../core/http-client.js'
 
 export const SOURCE = 'example-photos'
@@ -15,12 +14,6 @@ const RawPhotoSchema = z.object({
   height: z.number().int().positive().optional(),
 })
 
-function baseUrl(): string {
-  const url = process.env.HARVESTER_EXAMPLE_URL
-  if (!url) throw new AdapterError('HARVESTER_EXAMPLE_URL absent', 'MISSING_CONFIG')
-  return url.replace(/\/$/, '')
-}
-
 /** Sous-ressource enfant : hydrate et met en cache sans créer d'entité métier. */
 export const examplePhotoAdapter: BaseAdapter = {
   name: SOURCE,
@@ -28,24 +21,19 @@ export const examplePhotoAdapter: BaseAdapter = {
   concurrency: 2,
 
   async execute({ externalId }) {
+    const base = requireBaseUrl('HARVESTER_EXAMPLE_URL')
     const raw = RawPhotoSchema.parse(
-      await fetchJson(`${baseUrl()}/photos/${encodeURIComponent(externalId)}`)
+      await fetchJson(`${base}/photos/${encodeURIComponent(externalId)}`)
     )
     const now = new Date()
+    const expiresAt = new Date(now.getTime() + CACHE_TTL_MS)
 
-    await db
+    await getDb()
       .insert(externalApiCache)
-      .values({
-        source: SOURCE,
-        cacheKey: `${SOURCE}:${raw.id}`,
-        payload: raw,
-        fetchedAt: now,
-        expiresAt: new Date(now.getTime() + CACHE_TTL_MS),
-        status: 'success',
-      })
+      .values({ source: SOURCE, cacheKey: `${SOURCE}:${raw.id}`, payload: raw, fetchedAt: now, expiresAt, status: 'success' })
       .onConflictDoUpdate({
         target: externalApiCache.cacheKey,
-        set: { payload: raw, fetchedAt: now, expiresAt: new Date(now.getTime() + CACHE_TTL_MS) },
+        set: { payload: raw, fetchedAt: now, expiresAt, status: 'success' },
       })
   },
 }

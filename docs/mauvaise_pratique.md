@@ -220,3 +220,14 @@ Ce document capitalise les erreurs majeures rencontrées au cours du développem
 * **Bonne Pratique :**
   - Un document précis par grande fonctionnalité dans [`docs/`](./docs/README.md), basé sur [`docs/_template.md`](./docs/_template.md).
   - Mise à jour obligatoire à chaque fin de session, avec index dans `docs/README.md` et références depuis `README.md`, `stack_universelle.md` et `avancement_projet.md`.
+
+---
+
+## 🛑 20. Lien symbolique hôte dans un dossier bind-monté masquant un point de montage Compose
+
+* **Problème / Symptôme :** `./start.sh` échoue au démarrage du conteneur avec `crun: creating '/app/shared-db': openat2 'app/shared-db': No such file or directory`.
+* **Conséquences :** Le service `harvester` refuse de démarrer sous Podman/`crun` alors que l'image construite seule fonctionne.
+* **Mauvaise Pratique :** Monter `./harvester:/app:z` quand `./harvester` contient le lien symbolique local `shared-db -> ../backend/src/db`, puis monter `./backend/src/db:/app/shared-db:ro,z` par-dessus : `/app/shared-db` devient un lien cassé dans le conteneur (`/backend/src/db` n'y existe pas) et `crun` échoue lors de la création du montage.
+* **Bonne Pratique :**
+  - Monter sélectivement `./harvester/src`, `package.json`, `package-lock.json`, `tsconfig.json` et `docker-entrypoint.sh` dans `/app/`, en conservant `/app/shared-db` comme vrai dossier dans l'image pour le montage `:ro,z` de `./backend/src/db`.
+  - Éviter de faire recouvrir un sous-montage Compose par un lien symbolique relatif issu d'un bind mount parent.

@@ -50,7 +50,7 @@ harvester/
         └── example-photo.adapter.ts # sous-ressource enfant
 ```
 
-Le schéma Drizzle n'est jamais dupliqué : `harvester/src/db/schema.ts` ré-exporte `shared-db/schema.ts`. En local, `harvester/shared-db` pointe vers `backend/src/db` ; dans Compose, ce dossier est monté en lecture seule (`:ro,z`) sur `/app/shared-db`. La source de vérité reste `backend/src/db/schema.ts`.
+Le schéma Drizzle n'est jamais dupliqué : `harvester/src/db/schema.ts` ré-exporte `shared-db/schema.ts`. En local, `harvester/shared-db` pointe vers `backend/src/db` ; dans Compose, `./harvester` est monté sélectivement (`src`, `package*.json`, `tsconfig.json`, `docker-entrypoint.sh`) afin que `/app/shared-db` reste un vrai dossier recevant `./backend/src/db` en lecture seule (`:ro,z`). La source de vérité reste `backend/src/db/schema.ts`.
 
 ## 5. Flux d'un job
 
@@ -79,8 +79,9 @@ Règles :
 - Les jobs ne transportent que des identifiants, jamais de payload métier.
 - `jobId` = hash de `<adapter>|<parentId|root>|<externalId>|<fenêtre de 60 s>` : déduplique les rafales sans bloquer un rafraîchissement ultérieur.
 - BullMQ interdit `:` dans les noms de file et les `jobId` : les noms sont normalisés et les identifiants hachés.
-- Un `429` lève `HttpError` avec `retryAfterMs` ; le worker met la file en pause avant de réessayer.
-- Une erreur de configuration lève `AdapterError` avec un code explicite.
+- Un `429` lève `HttpError` avec `retryAfterMs` ; le worker gèle la file via `queue.rateLimit(ms)` et lève `Worker.RateLimitError()` sans consommer de tentative.
+- Une erreur de configuration (`AdapterError` non réessayable) ou de schéma (`ZodError`) est encapsulée dans `UnrecoverableError` pour éviter des retries inutiles.
+- `example.adapter.ts` exécute les upserts `external_api_cache` et `locations` dans une transaction SQL unique.
 
 ## 7. Adaptateur de démonstration
 

@@ -12,7 +12,10 @@
 - [x] Backend **Hono + TypeScript** (`backend/src/index.ts`) exposant `GET /` et `GET /health`.
 - [x] Port API configurable via `API_PORT` (cohérent entre `.env`, `compose.yaml` et le serveur).
 - [x] Base **PostgreSQL 16 + PostGIS 3.4** opérationnelle avec `healthcheck` (`pg_isready`).
-- [x] **Drizzle ORM** installé dans le backend (`drizzle-orm`, `postgres`) avec schéma partagé (`backend/src/db/schema.ts`) : `external_api_cache` et `locations` (géométrie `SRID 4326`, index GIST).
+- [x] **Drizzle ORM + migrations SQL** : `backend/src/db/migrate.ts` applique `0001_initial.sql` (extension `postgis`, `external_api_cache`, `locations` + index GIST) sous verrou consultatif au démarrage ; `@prisma/client` supprimé.
+- [x] **Endpoints socle Hono** : `/health` (PostgreSQL + Redis réels), `/api/locations` (filtres texte/source/rayon PostGIS, plafond `limit <= 200`), `/api/locations/:source/:externalId` (fraîcheur cache) et `POST /api/harvest/:adapter` (`202 Accepted` vers Redis/BullMQ), avec CORS et `secureHeaders()`.
+- [x] **Frontend socle connecté** : thème bleu clair nuageux (`#f3f9ff` / `#0f172a`), `GlassSurface`, `AsyncSection`, `LocationCard`, `HarvestBubble`, config Android `10.0.2.2`, ESLint Expo configuré sans invite interactive.
+- [x] **Montages Compose & tests** : montages sélectifs `harvester` évitant la collision symlink `/app/shared-db`, `healthcheck` sur `backend` et `harvester`, suites de tests `node --test` dans `backend/tests/` et `harvester/tests/`.
 
 ### Orchestration & lancement
 - [x] `start.sh` **sans aucune option** : un seul `./start.sh` détecte, installe, prépare et démarre tout.
@@ -73,14 +76,11 @@
 
 ## 🔄 Prochains chantiers prioritaires
 
-1. **Migrations & extension PostGIS** — Générer les migrations Drizzle pour `external_api_cache` et `locations`, activer `postgis`, puis remplacer `@prisma/client` par Drizzle dans le backend.
-2. **Adaptateurs réels** — Implémenter SIRENE, Open Data SNCF ou OSM Overpass et désactiver les adaptateurs de démonstration.
-3. **Endpoints métier Hono** — Exposer la lecture locale, le push de jobs et le statut `202 Accepted`.
-4. **Hydratation des entités enfants** — Généraliser le dispatch de sous-tâches et les indicateurs `complete` / `partial` / `stale`.
-5. **Authentification frictionless** — PIN / Magic Links, hachage Argon2/Bcrypt, sessions HttpOnly, rate-limiting.
-6. **Design system glassmorphisme** — Tokens de couleur bleu clair, composants `Card`, `GlassSurface`, `CloudBackdrop`, états `loading/empty/error`, spinners locaux.
-7. **Accessibilité** — Audit contraste AA, tailles de texte, cibles 48 px, navigation clavier et test à 200 % de zoom.
-8. **Tests** — Tests unitaires (normalisation, cache, rate-limit), tests d'intégration `/health` et endpoints métier, test de non-régression du lancement Podman.
+1. **Adaptateurs réels** — Implémenter SIRENE, Open Data SNCF ou OSM Overpass et désactiver les adaptateurs de démonstration.
+2. **Hydratation des entités enfants** — Généraliser le dispatch de sous-tâches et les indicateurs `complete` / `partial` / `stale`.
+3. **Authentification frictionless** — PIN / Magic Links, hachage Argon2/Bcrypt, sessions HttpOnly, rate-limiting.
+4. **Mode hors-ligne & SEO** — Cache local persistant, file de mutations, métadonnées Open Graph / JSON-LD et sitemap.
+5. **Tests d'intégration complets** — Tests bout-en-bout avec PostgreSQL/Redis et tests de rendu/accessibilité UI à 200 % de zoom.
 
 ---
 
